@@ -14,7 +14,7 @@ const clientDistPath = path.join(__dirname, "../client/dist");
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use("/public", express.static("public"));
+app.use("/public", express.static(path.join(__dirname, "public")));
 app.use(express.static(clientDistPath));
 
 const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:3000,http://localhost:5000,http://localhost:5173")
