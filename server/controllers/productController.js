@@ -1,4 +1,6 @@
 const Product = require("../models/Product");
+const InventoryHistory = require("../models/InventoryHistory");
+const { setStockLevel } = require("../utils/stockMovement");
 
 // ================= SEARCH =================
 const searchProducts = async (req, res) => {
@@ -56,12 +58,23 @@ const createProduct = async (req, res) => {
             sku,
             category,
             subcategory,
-            price,
-            stock,
+            price: Number(price),
+            stock: Number(stock || 0),
             description,
             image: mainImage,
             images: galleryImages
         });
+
+        if (Number(product.stock || 0) > 0) {
+            await InventoryHistory.create({
+                product: product._id,
+                type: "add",
+                qty: product.stock,
+                reason: "Opening stock",
+                previousStock: 0,
+                newStock: product.stock
+            });
+        }
 
         res.json({ success: true, data: product });
 
@@ -75,7 +88,14 @@ const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const existing = await Product.findById(id);
+        if (!existing) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
         const updateData = { ...req.body };
+        const hasStockUpdate = Object.prototype.hasOwnProperty.call(updateData, "stock");
+        const nextStock = hasStockUpdate ? Number(updateData.stock) : existing.stock;
 
         if (req.files?.image) {
             updateData.image = `/public/products/${req.files.image[0].filename}`;
@@ -85,7 +105,13 @@ const updateProduct = async (req, res) => {
             updateData.images = req.files.images.map(f => `/public/products/${f.filename}`);
         }
 
-        const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
+        delete updateData.stock;
+
+        await Product.findByIdAndUpdate(id, updateData, { new: true });
+
+        const product = hasStockUpdate && Number(existing.stock || 0) !== nextStock
+            ? await setStockLevel({ productId: id, stock: nextStock, reason: "Product stock edit" })
+            : await Product.findById(id);
 
         res.json({ success: true, data: product });
 

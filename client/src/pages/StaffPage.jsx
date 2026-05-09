@@ -35,6 +35,7 @@ export default function StaffPage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    password: "",
     role: "Staff",
     status: "Active",
     image: null
@@ -91,6 +92,12 @@ export default function StaffPage() {
 
     if (isBlank(form.name)) nextErrors.name = "Name is required";
     if (!emailRegex.test(form.email)) nextErrors.email = "Enter a valid email";
+    if (!editData && (!form.password || form.password.length < 6)) {
+      nextErrors.password = "Password must be at least 6 characters";
+    }
+    if (editData && form.password && form.password.length < 6) {
+      nextErrors.password = "Password must be at least 6 characters";
+    }
 
     const exists = staff.some(
       (s) =>
@@ -123,6 +130,7 @@ export default function StaffPage() {
       const formData = new FormData();
       formData.append("name", form.name);
       formData.append("email", form.email);
+      if (form.password) formData.append("password", form.password);
       formData.append("role", form.role);
       formData.append("status", form.status);
 
@@ -166,6 +174,7 @@ export default function StaffPage() {
     setForm({
       name: row.fullName,
       email: row.email,
+      password: "",
       role: row.role,
       status: row.status,
       image: null
@@ -181,6 +190,7 @@ export default function StaffPage() {
     setForm({
       name: "",
       email: "",
+      password: "",
       role: "Staff",
       status: "Active",
       image: null
@@ -334,6 +344,15 @@ export default function StaffPage() {
             error={Boolean(errors.email)}
             helperText={errors.email}
             onChange={(e) => setForm({ ...form, email: e.target.value.trim().toLowerCase() })} />
+
+          <TextField
+            label={editData ? "New Password (optional)" : "Password"}
+            value={form.password}
+            type="password"
+            error={Boolean(errors.password)}
+            helperText={errors.password || (editData ? "Leave blank to keep current password" : "")}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
 
           <TextField select label="Role" value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}>

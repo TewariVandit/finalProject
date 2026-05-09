@@ -36,7 +36,7 @@ export default function SalesPage() {
     // ================= FORM =================
     const emptySale = {
         customer: "",
-        items: [{ name: "", qty: 1, price: 0 }],
+        items: [{ product: "", name: "", qty: 1, price: 0, stock: 0 }],
         total: 0,
         staff: "",
         payment: "Cash",
@@ -120,9 +120,10 @@ export default function SalesPage() {
         if (isBlank(form.customer)) nextErrors.customer = "Customer is required";
         if (isBlank(form.staff)) nextErrors.staff = "Staff is required";
         form.items.forEach((item, index) => {
-            if (isBlank(item.name)) nextErrors[`item-${index}`] = "Item is required";
+            if (isBlank(item.product)) nextErrors[`item-${index}`] = "Select a product";
             if (!isPositiveNumber(item.qty)) nextErrors[`qty-${index}`] = "Valid qty required";
             if (!isPositiveNumber(item.price)) nextErrors[`price-${index}`] = "Valid price required";
+            if (Number(item.qty) > Number(item.stock || 0)) nextErrors[`qty-${index}`] = `Only ${item.stock || 0} in stock`;
         });
 
         setErrors(nextErrors);
@@ -131,7 +132,15 @@ export default function SalesPage() {
             return;
         }
 
-        await API.post("/sales", form);
+        await API.post("/sales", {
+            ...form,
+            items: form.items.map(({ product, name, qty, price }) => ({
+                product,
+                name,
+                qty,
+                price
+            }))
+        });
         fetchSales();
         setAddOpen(false);
         setForm(emptySale);
@@ -154,6 +163,7 @@ export default function SalesPage() {
     );
 
     const totalRevenue = filteredRows.reduce((s, r) => s + r.total, 0);
+    const staffFilterOptions = [...new Set(rows.map((row) => row.staff).filter(Boolean))];
 
     // ================= UI =================
     const getStatus = (status) => (
@@ -193,8 +203,9 @@ export default function SalesPage() {
 
                 <TextField select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
                     <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="Amit">Amit</MenuItem>
-                    <MenuItem value="Rohit">Rohit</MenuItem>
+                    {staffFilterOptions.map((staff) => (
+                        <MenuItem key={staff} value={staff}>{staff}</MenuItem>
+                    ))}
                 </TextField>
 
                 <Button variant="contained" onClick={() => setAddOpen(true)}>
@@ -298,28 +309,34 @@ export default function SalesPage() {
                         {form.items.map((item, index) => (
                             <Stack key={index} direction="row" spacing={1}>
                                 <Autocomplete
-                                    freeSolo
                                     options={productOptions}
                                     getOptionLabel={(option) => typeof option === "string" ? option : option.name || ""}
                                     inputValue={item.name}
-                                    sx={{ minWidth: 170 }}
-                                    onInputChange={(event, value) => {
+                                    sx={{ minWidth: 220 }}
+                                    onInputChange={(event, value, reason) => {
+                                        if (reason === "reset") return;
                                         setProductSearch(value);
                                         const items = [...form.items];
-                                        items[index].name = value;
+                                        items[index] = { ...items[index], product: "", name: value, price: 0, stock: 0 };
                                         calculateTotal(items);
                                     }}
                                     onChange={(event, value) => {
                                         const items = [...form.items];
                                         if (value && typeof value !== "string") {
-                                            items[index] = { ...items[index], name: value.name, price: Number(value.price || 0) };
+                                            items[index] = {
+                                                ...items[index],
+                                                product: value._id,
+                                                name: value.name,
+                                                price: Number(value.price || 0),
+                                                stock: Number(value.stock || 0)
+                                            };
                                         }
                                         calculateTotal(items);
                                     }}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
-                                            label="Item"
+                                            label="Product"
                                             error={Boolean(errors[`item-${index}`])}
                                             helperText={errors[`item-${index}`]}
                                         />
@@ -351,7 +368,7 @@ export default function SalesPage() {
                         ))}
 
                         <Button onClick={() =>
-                            calculateTotal([...form.items, { name: "", qty: 1, price: 0 }])
+                            calculateTotal([...form.items, { product: "", name: "", qty: 1, price: 0, stock: 0 }])
                         }>
                             + Add Item
                         </Button>

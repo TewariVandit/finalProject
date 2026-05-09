@@ -56,7 +56,8 @@ const dashboard = {
           id: 'staff',
           title: 'Staff',
           type: 'item',
-          url: '/staff-page'
+          url: '/staff-page',
+          adminOnly: true
         }
       ]
     },

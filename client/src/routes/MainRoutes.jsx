@@ -5,6 +5,7 @@ import { Navigate } from "react-router-dom";
 import Loadable from 'components/Loadable';
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from "./ProtectedRoute";
+import AdminOnlyRoute from "./AdminOnlyRoute";
 
 // existing pages
 import StaffPage from '../pages/StaffPage';
@@ -75,7 +76,7 @@ const MainRoutes = {
     { path: 'product-page', element: <ProductManagement /> },
     { path: 'report-page', element: <ReportsPage /> },
     { path: 'sales-page', element: <SalesPage /> },
-    { path: 'staff-page', element: <StaffPage /> },
+    { path: 'staff-page', element: <AdminOnlyRoute><StaffPage /></AdminOnlyRoute> },
     { path: 'users-page', element: <UserManagementPage /> },
 
     // ================= NEW - ITEMS =================

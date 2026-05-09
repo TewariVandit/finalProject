@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-// material-ui
 import Collapse from '@mui/material/Collapse';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
@@ -10,16 +9,17 @@ import Tooltip from '@mui/material/Tooltip';
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 
-// router
 import { useNavigate, useLocation } from 'react-router-dom';
 
-// project import
 import { useGetMenuMaster } from 'api/menu';
+import { useAuth } from 'context/AuthContext';
 
 export default function NavGroup({ item }) {
   const [openId, setOpenId] = useState(null);
   const navigate = useNavigate();
-  const location = useLocation(); // 🔥 active route
+  const location = useLocation();
+  const { admin } = useAuth();
+  const isAdmin = admin?.role === "Admin";
 
   const { menuMaster } = useGetMenuMaster();
   const drawerOpen = menuMaster.isDashboardDrawerOpened;
@@ -28,11 +28,20 @@ export default function NavGroup({ item }) {
     setOpenId((prev) => (prev === id ? null : id));
   };
 
-  const navItems = item.children?.map((menuItem) => {
+  const visibleChildren = item.children
+    ?.map((menuItem) => {
+      if (menuItem.adminOnly && !isAdmin) return null;
+      if (menuItem.children) {
+        const children = menuItem.children.filter((child) => !child.adminOnly || isAdmin);
+        if (!children.length) return null;
+        return { ...menuItem, children };
+      }
+      return menuItem;
+    })
+    .filter(Boolean);
 
-    // ================= COLLAPSE =================
+  const navItems = visibleChildren?.map((menuItem) => {
     if (menuItem.type === 'collapse') {
-
       const isChildActive = menuItem.children?.some(
         (child) => location.pathname === child.url
       );
@@ -44,7 +53,6 @@ export default function NavGroup({ item }) {
       return (
         <Box key={menuItem.id}>
           <Tooltip title={!drawerOpen ? menuItem.title : ''} placement="right">
-
             <ListItemButton
               onClick={() => handleToggle(menuItem.id)}
               sx={{
@@ -54,7 +62,6 @@ export default function NavGroup({ item }) {
                 alignItems: 'center'
               }}
             >
-              {/* ICON */}
               {menuItem.icon && (
                 <ListItemIcon
                   sx={{
@@ -67,29 +74,24 @@ export default function NavGroup({ item }) {
                 </ListItemIcon>
               )}
 
-              {/* TEXT */}
               {drawerOpen && (
                 <ListItemText primary={menuItem.title} sx={{ ml: 1 }} />
               )}
 
-              {/* ARROW */}
               {drawerOpen && (
                 <ExpandMoreIcon
                   sx={{
-                    ml: 'auto', // 🔥 THIS FIXES ALIGNMENT
+                    ml: 'auto',
                     transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: '0.3s'
                   }}
                 />
               )}
             </ListItemButton>
-
           </Tooltip>
 
-          {/* CHILDREN */}
           <Collapse in={isOpen && drawerOpen} timeout="auto" unmountOnExit>
             {menuItem.children?.map((child) => {
-
               const isChildActive = location.pathname === child.url;
 
               return (
@@ -116,9 +118,7 @@ export default function NavGroup({ item }) {
       );
     }
 
-    // ================= SINGLE ITEM =================
     if (menuItem.type === 'item') {
-
       const isActive = location.pathname === menuItem.url;
 
       return (
@@ -142,7 +142,6 @@ export default function NavGroup({ item }) {
               borderLeft: isActive ? '3px solid #1976d2' : '3px solid transparent'
             }}
           >
-            {/* ICON */}
             {menuItem.icon && (
               <ListItemIcon
                 sx={{
@@ -155,7 +154,6 @@ export default function NavGroup({ item }) {
               </ListItemIcon>
             )}
 
-            {/* TEXT */}
             {drawerOpen && (
               <ListItemText primary={menuItem.title} sx={{ ml: 1 }} />
             )}
@@ -167,5 +165,5 @@ export default function NavGroup({ item }) {
     return null;
   });
 
-  return <List sx={{ py: 0, marginBottom:"20px" }}>{navItems}</List>;
+  return <List sx={{ py: 0, marginBottom: "20px" }}>{navItems}</List>;
 }

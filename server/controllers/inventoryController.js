@@ -3,6 +3,7 @@ const InventoryHistory = require("../models/InventoryHistory.js");
 const PurchaseOrder = require("../models/PurchaseOrder.js");
 const Supplier = require("../models/Supplier.js");
 const PurchaseReturn = require("../models/PurchaseReturn");
+const { recordStockMovement, setStockLevel } = require("../utils/stockMovement");
 
 const getInventory = async (req, res) => {
   try {
@@ -72,32 +73,11 @@ const getInventory = async (req, res) => {
 const updateStock = async (req, res) => {
   try {
     const { id } = req.params;
-    const { stock, reason } = req.body;
+    const { stock, qty, type = "set", reason } = req.body;
 
-    const product = await Product.findById(id);
-
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    const previousStock = product.stock;
-
-    // determine type
-    const type = stock > previousStock ? "add" : "remove";
-    const qty = Math.abs(stock - previousStock);
-
-    product.stock = stock;
-    await product.save();
-
-    // create history entry
-    await InventoryHistory.create({
-      product: product._id,
-      type,
-      qty,
-      reason,
-      previousStock,
-      newStock: stock
-    });
+    const product = type === "set"
+      ? await setStockLevel({ productId: id, stock, reason: reason || "Manual stock update" })
+      : await recordStockMovement({ productId: id, type, qty, reason: reason || "Manual stock adjustment" });
 
     res.json({
       success: true,
@@ -106,7 +86,7 @@ const updateStock = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(400).json({ message: err.message });
   }
 };
 
@@ -161,24 +141,11 @@ const createPurchaseOrder = async (req, res) => {
     for (const item of data.items) {
       if (!item.product) continue;
 
-      const product = await Product.findById(item.product);
-
-      if (!product) continue;
-
-      const previousStock = product.stock;
-      const newStock = previousStock + item.qty;
-
-      product.stock = newStock;
-      await product.save();
-
-      // history entry
-      await InventoryHistory.create({
-        product: product._id,
+      await recordStockMovement({
+        productId: item.product,
         type: "add",
         qty: item.qty,
-        reason: `PO: ${data.orderNo}`,
-        previousStock,
-        newStock
+        reason: `PO: ${data.orderNo}`
       });
     }
 

@@ -49,7 +49,9 @@ export default function InventoryPage() {
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [newStock, setNewStock] = useState("");
+  const [adjustmentType, setAdjustmentType] = useState("add");
+  const [adjustmentQty, setAdjustmentQty] = useState("");
+  const [reason, setReason] = useState("");
   const [stockError, setStockError] = useState("");
 
   const [anchorEl, setAnchorEl] = useState(null);
@@ -93,20 +95,23 @@ export default function InventoryPage() {
   // ================= UPDATE =================
   const handleUpdate = async () => {
     try {
-      if (!isNonNegativeInteger(newStock)) {
-        setStockError("Stock must be 0 or more");
+      if (!isNonNegativeInteger(adjustmentQty) || Number(adjustmentQty) === 0) {
+        setStockError("Quantity must be greater than 0");
         toast.error("Enter a valid stock quantity");
         return;
       }
 
       await API.put(`/inventory/${selected.id}/stock`, {
-        stock: Number(newStock)
+        type: adjustmentType,
+        qty: Number(adjustmentQty),
+        reason
       });
 
       toast.success("Stock updated");
 
       setOpen(false);
       setStockError("");
+      setReason("");
       fetchInventory();
 
     } catch (err) {
@@ -240,7 +245,9 @@ export default function InventoryPage() {
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
         <MuiMenuItem
           onClick={() => {
-            setNewStock(selected.stock);
+            setAdjustmentType("add");
+            setAdjustmentQty("");
+            setReason("");
             setOpen(true);
             handleMenuClose();
           }}
@@ -263,19 +270,39 @@ export default function InventoryPage() {
         <DialogContent sx={{ mt: 2 }}>
           <Typography mb={2}>{selected?.name}</Typography>
 
-          <TextField
-            label="Stock"
-            type="number"
-            fullWidth
-            value={newStock}
-            inputProps={{ min: 0, step: 1 }}
-            error={Boolean(stockError)}
-            helperText={stockError}
-            onChange={(e) => {
-              setStockError("");
-              setNewStock(e.target.value.replace(/\D/g, ""));
-            }}
-          />
+          <Stack spacing={2}>
+            <TextField
+              select
+              label="Action"
+              fullWidth
+              value={adjustmentType}
+              onChange={(e) => setAdjustmentType(e.target.value)}
+            >
+              <MenuItem value="add">Add Stock</MenuItem>
+              <MenuItem value="remove">Deduct Stock</MenuItem>
+            </TextField>
+
+            <TextField
+              label="Quantity"
+              type="number"
+              fullWidth
+              value={adjustmentQty}
+              inputProps={{ min: 1, step: 1 }}
+              error={Boolean(stockError)}
+              helperText={stockError}
+              onChange={(e) => {
+                setStockError("");
+                setAdjustmentQty(e.target.value.replace(/\D/g, ""));
+              }}
+            />
+
+            <TextField
+              label="Reason"
+              fullWidth
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </Stack>
         </DialogContent>
 
         <DialogActions>

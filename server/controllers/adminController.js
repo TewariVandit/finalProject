@@ -9,6 +9,10 @@ const loginAdmin = async (req, res) => {
   const admin = await Admin.findOne({ email });
 
   if (admin && (await bcrypt.compare(password, admin.password))) {
+    if (admin.status !== "Active") {
+      return res.status(403).json({ message: "Account is inactive" });
+    }
+
     generateToken(res, admin._id);
 
     res.json({
@@ -16,6 +20,8 @@ const loginAdmin = async (req, res) => {
       fullName: admin.fullName,
       email: admin.email,
       image: admin.image,
+      role: admin.role,
+      status: admin.status
     });
   } else {
     res.status(401).json({ message: "Invalid email or password" });

@@ -1,4 +1,10 @@
 const Admin = require("../models/Admin");
+const bcrypt = require("bcryptjs");
+
+const hashPassword = async (password) => {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+};
 
 // ================= GET STAFF =================
 const getStaff = async (req, res) => {
@@ -29,7 +35,11 @@ const getStaff = async (req, res) => {
 // ================= CREATE STAFF =================
 const createStaff = async (req, res) => {
   try {
-    const { name, email, role, status } = req.body;
+    const { name, email, role, status, password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
 
     const exists = await Admin.findOne({ email });
     if (exists) {
@@ -39,7 +49,7 @@ const createStaff = async (req, res) => {
     const staff = await Admin.create({
       fullName: name,
       email,
-      password: "123456",
+      password: await hashPassword(password),
       role,
       status,
       image: req.file ? `/public/uploads/${req.file.filename}` : ""
@@ -56,7 +66,7 @@ const createStaff = async (req, res) => {
 const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, status } = req.body;
+    const { name, email, role, status, password } = req.body;
 
     const updateData = {
       fullName: name,
@@ -67,6 +77,13 @@ const updateStaff = async (req, res) => {
 
     if (req.file) {
       updateData.image = `/public/uploads/${req.file.filename}`;
+    }
+
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      updateData.password = await hashPassword(password);
     }
 
     const staff = await Admin.findByIdAndUpdate(

@@ -1,22 +1,59 @@
 const Sale = require("../models/Sale");
 const Product = require("../models/Product");
 const SalesReturn = require("../models/SalesReturn");
+const { recordStockMovement } = require("../utils/stockMovement");
 
 const createSale = async (req, res) => {
     try {
-        const sale = await Sale.create(req.body);
+        const items = req.body.items || [];
 
-        // 🔥 reduce stock
-        for (let item of req.body.items) {
-            await Product.findByIdAndUpdate(item.product, {
-                $inc: { stock: -item.qty }
+        if (!items.length) {
+            return res.status(400).json({ message: "Add at least one item" });
+        }
+
+        for (const item of items) {
+            if (!item.product) {
+                return res.status(400).json({ message: `Select a saved product for ${item.name || "each item"}` });
+            }
+
+            const qty = Number(item.qty);
+            if (!Number.isInteger(qty) || qty <= 0) {
+                return res.status(400).json({ message: "Quantity must be greater than 0" });
+            }
+
+            const product = await Product.findById(item.product);
+            if (!product) {
+                return res.status(404).json({ message: "Product not found" });
+            }
+
+            if (Number(product.stock || 0) < qty) {
+                return res.status(400).json({ message: `Not enough stock for ${product.name}` });
+            }
+        }
+
+        const sale = await Sale.create({
+            ...req.body,
+            items: items.map((item) => ({
+                ...item,
+                qty: Number(item.qty),
+                price: Number(item.price)
+            })),
+            total: Number(req.body.total || 0)
+        });
+
+        for (const item of sale.items) {
+            await recordStockMovement({
+                productId: item.product,
+                type: "remove",
+                qty: item.qty,
+                reason: `Sale: ${sale._id}`
             });
         }
 
         res.status(201).json({ success: true, data: sale });
 
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(400).json({ message: err.message });
     }
 };
 
@@ -53,10 +90,25 @@ const updateSaleStatus = async (req, res) => {
 
 const deleteSale = async (req, res) => {
     try {
+        const sale = await Sale.findById(req.params.id);
+        if (!sale) {
+            return res.status(404).json({ message: "Sale not found" });
+        }
+
+        for (const item of sale.items || []) {
+            if (!item.product) continue;
+            await recordStockMovement({
+                productId: item.product,
+                type: "add",
+                qty: item.qty,
+                reason: `Sale deleted: ${sale._id}`
+            });
+        }
+
         await Sale.findByIdAndDelete(req.params.id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(400).json({ message: err.message });
     }
 };
 
@@ -138,7 +190,6 @@ const deleteChallan = async (req, res) => {
     }
 };
 
-
 const createSalesReturn = async (req, res) => {
     try {
         const returnData = await SalesReturn.create(req.body);
@@ -211,4 +262,4 @@ module.exports = {
     getSalesReturns,
     updateSalesReturn,
     deleteSalesReturn
-}
+};
